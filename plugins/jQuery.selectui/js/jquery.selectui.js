@@ -2,7 +2,9 @@
 (function($){
 	var msie = (function(w,d){return ("XMLHttpRequest" in w ? d.querySelector ? d.documentMode : 7 : 6)})(top,top.document),
 		minWidth = msie < 7 ? "width" : "minWidth",
+		activeElement,
 		selectQueue,
+		loopTimer,
 		fixie;
 
 	function create(className, nodeName){
@@ -36,7 +38,7 @@
 				createMenu(selectui, select);
 	
 			}
-	
+
 			//建立下拉菜单
 			function createMenu(selectui, select){
 				return createOpts(create("select_menu_ui"), select).appendTo(selectui).hover(function(){
@@ -45,7 +47,7 @@
 					$(this).width("");
 				});
 			}
-	
+
 			//建立下拉菜单中的选项
 			function createOpts(menu, select){
 				menu.html("");
@@ -67,12 +69,14 @@
 				menu.children().eq(select.selectedIndex).addClass("option_hover_ui");
 				return menu.css("left", "-99999em");
 			}
-	
+
 			//除not外，关闭所有select
 			function hideAll(not){
 				var tag = $(".select_ui");
-				if(not){
+				if(not && not.length){
 					tag = tag.not(not);
+				} else {
+					activeElement = null;
 				}
 				tag.each(function(i) {
 					var selectui = $(this);
@@ -80,21 +84,22 @@
 					hideMenu(selectui);
 				});
 			}
-	
+
 			//关闭指定的select下拉菜单
 			function hideMenu(selectui, menu){
 				selectui.css({zIndex: ""});
 				( menu || selectui.find(".select_menu_ui") ).css("left", "-99999em");
 			}
-	
+
 			//显示下拉菜单
 			function showMenu(selectui, menu, select){
+				activeElement = select;
 				hideAll(selectui);
 				createOpts(menu, select);
 				selectui.css({zIndex: 0xffff});
 				menu.css({left: 0});
 			}
-	
+
 			//页面点击除select_ui外任意位置，关闭下拉菜单
 			$(document).click(function(e){
 				hideAll($(e.target).closest(".select_ui"));
@@ -137,21 +142,21 @@
 		}
 	}
 
-	//不支持propertychange事件的浏览器(除IE6、7、8、9外)中使用定时器来刷select文字
+	//使用定时器来刷select文字
 	function startInterval(select){
 		if(selectQueue){
 			selectQueue.push(select);
 		} else {
 			selectQueue = [select];
-			(function(){
+			clearInterval(loopTimer);
+			loopTimer = setInterval(function(){
 				$.each(selectQueue, function(){
 					//解决bug，火狐下selectIndex会随菜单项滑动而变化
-					if(!(window.netscape && document.activeElement == this)){
+					if((activeElement || document.activeElement) !== this){
 						modifyText(this);
 					}
 				});
-				setTimeout(arguments.callee, 200);
-			})();
+			}, 200);
 		}
 	}
 
@@ -177,7 +182,7 @@
 					var select = this;
 					modifyTextTimer = setTimeout(function(){
 						modifyText(select);
-					}, e.type == "propertychange" ? 200 : 10);
+					}, 10);
 				}).each(function(){
 					modifyText(this);
 				});
@@ -193,14 +198,7 @@
 					});
 				}
 
-				//解决初始化样式后，其他js又修改select选项
-				if( "onpropertychange" in select[0] ){
-					//IE6、7、8、9下延迟触发一次propertychange，避免初始化后其他js为select单纯增加Option但未去修改selectIndex，从而未触发propertychange事件
-					select.triggerHandler("propertychange");
-				} else {
-					//高端浏览器性能有富余，每隔200毫秒检查一次
-					startInterval(select[0]);
-				}
+				startInterval(this);
 			}
 		});
 	};

@@ -30,7 +30,7 @@
 		var v = node.validity;
 		if(v) {
 			node = $(node);
-	
+
 			opt.validClass && node.toggleClass(opt.validClass, v.valid);
 			opt.invalidClass && node.toggleClass(opt.invalidClass, (!v.valueMissing && !v.valid));
 			opt.requiredClass && node.toggleClass(opt.requiredClass, v.valueMissing);
@@ -51,7 +51,7 @@
 
 		//绑定事件处理函数
 		function prevent(node){
-			$(node).bind("invalid", invalidFn);
+			return $(node).bind("invalid", invalidFn);
 		}
 
 		//不支持HTML5验证的浏览器，使用H5F
@@ -61,11 +61,18 @@
 
 		//将现有表单元素去除默认行为
 		prevent(form.elements);
-		prevent(form);
+		form = prevent(form).delegate(":text,textarea", "change", function(e){
+			//文本框自动trim
+			var input = e.target;
+
+			if(/^\s+$/.test(input.value)){
+				input.value = $.trim(input.value);
+			}
+		});
 
 		if(support || doc.createEvent) {
 
-			form = $(form).bind("DOMNodeInserted", function(e){
+			form.bind("DOMNodeInserted", function(e){
 				var target = e.target;
 				if("validity" in target && "checkValidity" in target){
 					//将动态添加的元素去除默认行为
@@ -97,13 +104,18 @@
 		if(opt.events){
 			for(var i in opt.events){
 				this.delegate(i, opt.events[i], function(e){
-					var input = e.target;
-					//狗日的IE10、11在change事件发生时select标签的validity还未更新，所以延迟
-					window.setTimeout(function(){
-						if(input.checkValidity && input.checkValidity()){
-							validityCall(opt, e);
-						}
-					}, 1);
+					var input = e.target,
+						callFn = function(){
+							if(input.checkValidity && input.checkValidity()){
+								validityCall(opt, e);
+							}
+						};
+					//IE10、11在change事件发生时select标签的validity还未更新，所以延迟
+					if(support && doc.documentMode && /select/i.test(input.tagName)){
+						setTimeout(callFn, 1);
+					} else {
+						callFn();
+					}
 				});
 			}
 		}
@@ -170,8 +182,8 @@
 				"*": "change"
 			}
 		}, opt)).delegate(":submit", "click", function(e){
-			if($(e.currentTarget).find(".loading:visible").length){
-				return false;
+			if($(e.liveFired).find(".loading:visible").length){
+				e.preventDefault();
 			}
 		});
 		return jqobj;
